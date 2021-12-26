@@ -1,0 +1,99 @@
+import numpy as np
+
+environment_rows = 11
+environment_columns = 11
+actions = ['up', 'right', 'down', 'left']
+
+#create 2D array to hold rewards for each state
+rewards = np.full((environment_rows, environment_columns), -100.)
+rewards[0, 5] = 100.
+
+aisles = {} 
+aisles[1] = [i for i in range(1, 10)]
+aisles[2] = [1, 7, 9]
+aisles[3] = [i for i in range(1, 8)]
+aisles[3].append(9)
+aisles[4] = [3, 7]
+aisles[5] = [i for i in range(11)]
+aisles[6] = [5]
+aisles[7] = [i for i in range(1, 10)]
+aisles[8] = [3, 7]
+aisles[9] = [i for i in range(11)]
+
+for row_index in range(1, 10):
+    for column_index in aisles[row_index]:
+        rewards[row_index, column_index] = -1
+        
+for row in rewards:
+    print(row)
+    
+# initialize V value at each state
+V = np.zeros((environment_rows, environment_columns,3))
+V [:,:,2] = rewards
+      
+# initialize policy at each state
+optimal_policy = np.zeros((environment_rows, environment_columns,3))
+
+#define a function that determines if the specified location is a terminal state
+def is_terminal_state(current_row_index, current_column_index):
+    if rewards[current_row_index, current_column_index] == -1.:
+        return False
+    else:
+        return True
+    
+#define a function that will get the next location based on the chosen action
+def get_next_location(current_row_index, current_column_index, action_index):
+    new_row_index = current_row_index
+    new_column_index = current_column_index
+    if actions[action_index] == 'up' and current_row_index > 0:
+        new_row_index -= 1
+    elif actions[action_index] == 'right' and current_column_index < environment_columns - 1:
+        new_column_index += 1
+    elif actions[action_index] == 'down' and current_row_index < environment_rows - 1:
+        new_row_index += 1
+    elif actions[action_index] == 'left' and current_column_index > 0:
+        new_column_index -= 1
+    return new_row_index, new_column_index
+    
+epsilon = 0.9 # percentage of time to take the best action (instead of a random action)
+pr_best = epsilon + (1-epsilon)/4 # probability of moving to the best adjacent location
+pr_others = (1-epsilon)/4 # probability of moving to the adjacent locations other than the best
+gamma = 0.9
+
+def value_iterations(V):
+    number_iterations = 0
+    while True:
+        oldV = V.copy()
+        for row_index in range(0,11):
+            for column_index in range(0,11):
+                if not is_terminal_state(row_index, column_index):
+                    Q = {}
+                    for a in range(0,4):
+                        new_row_index, new_column_index = get_next_location(row_index, column_index, a)
+                        
+                        #find out the other 3 non-favorable directions
+                        direction_index = np.array([0,1,2,3])
+                        other_direction_index = np.delete(direction_index, np.where(direction_index == a))
+                        other_row_index_1, other_column_index_1 = get_next_location(row_index, column_index, other_direction_index[0])
+                        other_row_index_2, other_column_index_2 = get_next_location(row_index, column_index, other_direction_index[1])
+                        other_row_index_3, other_column_index_3 = get_next_location(row_index, column_index, other_direction_index[2])
+                                
+                        Q[a] = rewards[row_index,column_index] + gamma*(pr_best*oldV[new_row_index,new_column_index,2]
+                                                                      +pr_others*oldV[other_row_index_1, other_column_index_1,2]
+                                                                      +pr_others*oldV[other_row_index_2, other_column_index_2,2]
+                                                                      +pr_others*oldV[other_row_index_3, other_column_index_3,2])
+                
+          
+                    V[row_index,column_index,2] = max(Q.values())
+                    optimal_policy[row_index,column_index,2] = max(Q, key = Q.get)
+        number_iterations = number_iterations + 1
+        if (abs(oldV[:,:,2] - V[:,:,2])<0.01).all():
+            break        
+    return V, optimal_policy, number_iterations
+
+V, optimal_policy, number_iterations = value_iterations(V)
+
+optimal_policy = optimal_policy[:,:,2]
+print(optimal_policy)
+
+print(number_iterations)
